@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Motion Graph Lab v2 — </title>
+<style>
+:root{
+  --bg:#f4f8fc; --card:#ffffff; --ink:#102a43; --muted:#627d98;
+  --blue:#2563eb; --blue-light:#dbeafe; --green:#059669; --red:#e11d48;
+  --grid:#e2e8f0; --axis:#334e68; --shadow:0 10px 30px rgba(16,42,67,.08);
+}
+*{box-sizing:border-box}
+body{
+  margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC","Microsoft JhengHei",sans-serif;
+  background:var(--bg);color:var(--ink);user-select:none;
+}
+button,input{font:inherit}
+.app{max-width:1280px;margin:auto;padding:20px}
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:16px}
+h1{font-size:clamp(22px,2.5vw,32px);margin:0;font-weight:800}
+.sub{color:var(--muted);margin-top:4px;font-size:14px}
+.score{background:#fff;border:1px solid #cbd5e1;border-radius:14px;padding:10px 16px;box-shadow:var(--shadow);font-weight:800;font-size:16px}
+.panel{background:var(--card);border:1px solid #e2e8f0;border-radius:20px;box-shadow:var(--shadow);padding:18px 22px;margin-bottom:16px}
+.question-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.badge{display:inline-flex;padding:6px 12px;border-radius:999px;background:var(--blue-light);color:var(--blue);font-weight:800;font-size:14px}
+.qtitle{font-size:19px;font-weight:800;margin-top:8px}
+.qtext{color:#486581;margin-top:4px;font-size:14px;line-height:1.5}
+.graphs{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px}
+.graph-card{background:#fff;border:2px solid #e2e8f0;border-radius:18px;padding:14px;transition:.2s}
+.graph-card.focus{border-color:var(--blue);background:#f8fbff;box-shadow:0 0 0 4px rgba(37,99,235,.12)}
+.graph-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.graph-title{font-weight:800;font-size:15px;margin:0}
+.graph-tag{font-size:12px;font-weight:700;padding:3px 8px;border-radius:6px}
+.tag-given{background:#dbeafe;color:#1e40af}
+.tag-draw{background:#fef3c7;color:#92400e}
+.canvas-wrap{position:relative;height:280px;border-radius:12px;overflow:hidden;background:#ffffff;border:1px solid #e2e8f0}
+canvas{width:100%;height:100%;display:block;touch-action:none;cursor:crosshair}
+.hint{font-size:12px;color:var(--muted);margin-top:8px;font-weight:600;display:flex;justify-content:space-between}
+.controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+button{
+  border:0;border-radius:12px;padding:10px 18px;font-weight:800;cursor:pointer;
+  transition:all .15s ease;font-size:14px
+}
+button:hover{transform:translateY(-1px)}
+.primary{background:var(--blue);color:white;box-shadow:0 6px 16px rgba(37,99,235,.25)}
+.secondary{background:#e0e7ff;color:#1e40af}
+.ghost{background:#f1f5f9;color:#475569}
+.green{background:#d1fae5;color:#065f46}
+.numberbox{
+  display:grid;grid-template-columns:1.5fr 1fr;gap:16px;align-items:center;margin-top:16px;
+  padding:16px;border-radius:14px;background:#f8fafc;border:1px solid #e2e8f0
+}
+.calc{font-weight:700;line-height:1.6;font-size:15px}
+.answer-row{display:flex;gap:10px;align-items:center}
+input{
+  width:140px;border:2px solid #cbd5e1;border-radius:10px;padding:9px 12px;background:white;
+  color:var(--ink);font-weight:700;outline:none
+}
+input:focus{border-color:var(--blue)}
+.feedback{margin-top:14px;border-radius:12px;padding:12px 16px;display:none;font-weight:700;font-size:14px;line-height:1.5}
+.feedback.ok{display:block;background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0}
+.feedback.bad{display:block;background:#fff1f2;color:#9f1239;border:1px solid #fecdd3}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;font-weight:700;color:#486581}
+.dot{width:12px;height:12px;border-radius:50%;display:inline-block;margin-right:6px;vertical-align:-1px}
+@media(max-width:960px){
+  .graphs{grid-template-columns:1fr}
+  .numberbox{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div>
+      <h1>Motion Graph Lab <span style="font-size:16px;color:var(--blue)">（）</span></h1>
+      <div class="sub"></div>
+    </div>
+    <div class="score">得分：<span id="score">0</span> / <span id="total">0</span></div>
+  </div>
+
+  <section class="panel">
+    <div class="question-head">
+      <div>
+        <span class="badge" id="givenBadge">已知：v–t 圖</span>
+        <div class="qtitle" id="qtitle"></div>
+        <div class="qtext" id="qtext">
+                  </div>
+      </div>
+      <div class="legend">
+        <span><i class="dot" style="background:#2563eb"></i>你的作答 / 已知曲線</span>
+        <span><i class="dot" style="background:#059669"></i>標準答案（核對後顯示）</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="graphs">
+    <div class="graph-card" id="card-s">
+      <div class="graph-header">
+        <div class="graph-title">位移–時間圖 s(t) / m</div>
+        <span class="graph-tag" id="tag-s"></span>
+      </div>
+      <div class="canvas-wrap"><canvas id="sCanvas"></canvas></div>
+      <div class="hint"><span id="sHint"></span><span id="sStatus"></span></div>
+    </div>
+
+    <div class="graph-card" id="card-v">
+      <div class="graph-header">
+        <div class="graph-title">速度–時間圖 v(t) / m s⁻¹</div>
+        <span class="graph-tag" id="tag-v"></span>
+      </div>
+      <div class="canvas-wrap"><canvas id="vCanvas"></canvas></div>
+      <div class="hint"><span id="vHint"></span><span id="vStatus"></span></div>
+    </div>
+
+    <div class="graph-card" id="card-a">
+      <div class="graph-header">
+        <div class="graph-title">加速度–時間圖 a(t) / m s⁻²</div>
+        <span class="graph-tag" id="tag-a"></span>
+      </div>
+      <div class="canvas-wrap"><canvas id="aCanvas"></canvas></div>
+      <div class="hint"><span id="aHint"></span><span id="aStatus"></span></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="controls">
+      <button class="primary" id="checkBtn">✓ 核對圖形答案 (Check Graphs)</button>
+      <button class="secondary" id="answerBtn">👁 顯示標準答案</button>
+      <button class="ghost" id="resetBtn">↺ 重設畫布</button>
+      <button class="green" id="nextBtn">下一題 (Next) →</button>
+    </div>
+
+    <div class="numberbox">
+      <div class="calc" id="calcText"></div>
+      <div>
+        <div class="answer-row">
+          <input id="numAnswer" type="number" step="0.5" placeholder="輸入數值" />
+          <span id="unitText" style="font-weight:800;color:#334e68"></span>
+          <button class="secondary" id="checkNum">核對計算</button>
+        </div>
+      </div>
+    </div>
+    <div class="feedback" id="feedback"></div>
+  </section>
+</div>
+
+<script>
+const TYPES = ['s', 'v', 'a'];
+const UNIT = { s: 'm', v: 'm s⁻¹', a: 'm s⁻²' };
+const NAME = { s: 's–t 圖', v: 'v–t 圖', a: 'a–t 圖' };
+const canvases = { s: document.getElementById('sCanvas'), v: document.getElementById('vCanvas'), a: document.getElementById('aCanvas') };
+const ctxs = {};
+
+let score = 0, total = 0, showSolution = false, current = null;
+let user = { s: null, v: null, a: null };
+
+function pick(arr){ return arr[Math.floor(Math.random() * arr.length)]; }
+
+// 精心設計整除且刻度漂亮的 DSE 題庫組合
+function makeQuestion(){
+  showSolution = false;
+  const presets = [
+    { mode: 'uniform', T: 4, v0: 4, a: 0 },   // sT = 16
+    { mode: 'uniform', T: 5, v0: 6, a: 0 },   // sT = 30
+    { mode: 'accel',   T: 4, v0: 0, a: 2 },   // vT = 8, sT = 16
+    { mode: 'accel',   T: 4, v0: 2, a: 2 },   // vT = 10, sT = 24
+    { mode: 'accel',   T: 6, v0: 0, a: 2 },   // vT = 12, sT = 36
+    { mode: 'decel',   T: 4, v0: 8, a: -2 },  // vT = 0, sT = 16
+    { mode: 'decel',   T: 6, v0: 12, a: -2 }, // vT = 0, sT = 36
+    { mode: 'rest',    T: 5, v0: 0, a: 0 }    // sT = 0
+  ];
+  const p = pick(presets);
+  // 若是靜止題，不選 a-t 為唯一已知（因為 a=0 無法推導出 v=0 定常數）
+  const validGivens = p.mode === 'rest' ? ['s', 'v'] : (p.a !== 0 ? ['s', 'v', 'a'] : ['s', 'v']);
+  const given = pick(validGivens);
+
+  const s0 = 0;
+  const sT = s0 + p.v0 * p.T + 0.5 * p.a * p.T * p.T;
+  const vT = p.v0 + p.a * p.T;
+
+  // 為每個圖設定固定的漂亮座標軸範圍與刻度步長 (yMin, yMax, step)
+  const scaleConfig = {
+    s: { min: 0, max: Math.max(20, Math.ceil(sT / 10) * 10), step: sT > 25 ? 10 : 4, snap: 0.5 },
+    v: { min: 0, max: Math.max(10, Math.ceil(Math.max(p.v0, vT) / 4) * 4), step: 2, snap: 1 },
+    a: { min: -4, max: 4, step: 1, snap: 1 }
+  };
+
+  current = { ...p, s0, sT, vT, given, scaleConfig };
+
+  setDefaultUser();
+  buildNumericQuestion();
+
+  let conditionHint = '';
+  if (given === 'a') conditionHint = `（已知初速度 u = ${p.v0} m s⁻¹，初位移 s₀ = 0 m）`;
+  if (given === 'v') conditionHint = `（已知初位移 s₀ = 0 m）`;
+
+  document.getElementById('givenBadge').textContent = `已知：${NAME[given]} ${conditionHint}`;
+  document.getElementById('feedback').className = 'feedback';
+  document.getElementById('feedback').textContent = '';
+  document.getElementById('numAnswer').value = '';
+
+  for(const k of TYPES){
+    const isGiven = (k === given);
+    document.getElementById('card-' + k).classList.toggle('focus', isGiven);
+    const tag = document.getElementById('tag-' + k);
+    tag.textContent = isGiven ? '📌 已知題目' : '✏️ 拖曳藍點作答';
+    tag.className = 'graph-tag ' + (isGiven ? 'tag-given' : 'tag-draw');
+    document.getElementById(k + 'Hint').textContent = isGiven
+      ? '請讀取圖上座標數值進行推算'
+      : (k === 's' ? '拖曳右端點調高度，拖曳中間點調彎曲方向' : (k === 'v' ? '拖曳左右兩端點調整初速與末速' : '上下拖曳調整水平線高度'));
+    document.getElementById(k + 'Status').textContent = '';
+  }
+  drawAll();
+}
+
+function setDefaultUser(){
+  user.s = { end: 0, mid: 0 }; // mid 代表 t = T/2 時的高度
+  user.v = { start: 0, end: 0 };
+  user.a = { val: 0 };
+}
+
+function targetVal(k, t){
+  if(k === 's') return current.s0 + current.v0 * t + 0.5 * current.a * t * t;
+  if(k === 'v') return current.v0 + current.a * t;
+  return current.a;
+}
+
+// 根據 t=0, t=T/2, t=T 三點繪製二次拋物線
+function userVal(k, t){
+  const f = t / current.T;
+  if(k === 's'){
+    const y0 = 0, yMid = user.s.mid, yEnd = user.s.end;
+    // Lagrange quadratic interpolation through (0, y0), (0.5, yMid), (1, yEnd)
+    return y0 * (1 - 3*f + 2*f*f) + yMid * (4*f - 4*f*f) + yEnd * (-f + 2*f*f);
+  }
+  if(k === 'v'){
+    return user.v.start + (user.v.end - user.v.start) * f;
+  }
+  return user.a.val;
+}
+
+function mapXY(k, t, val, w, h){
+  const pad = { l: 46, r: 24, t: 22, b: 34 };
+  const { min, max } = current.scaleConfig[k];
+  const x = pad.l + (t / current.T) * (w - pad.l - pad.r);
+  const y = pad.t + (max - val) / (max - min) * (h - pad.t - pad.b);
+  return [x, y];
+}
+
+function invYWithSnap(k, y, w, h){
+  const pad = { l: 46, r: 24, t: 22, b: 34 };
+  const { min, max, snap } = current.scaleConfig[k];
+  let raw = max - (y - pad.t) / (h - pad.t - pad.b) * (max - min);
+  raw = Math.max(min, Math.min(max, raw));
+  return Math.round(raw / snap) * snap;
+}
+
+function drawGridAndAxes(k, ctx, w, h){
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, w, h);
+
+  const pad = { l: 46, r: 24, t: 22, b: 34 };
+  const { min, max, step } = current.scaleConfig[k];
+
+  // 1. 垂直時間格線與 X 軸秒數刻度
+  ctx.font = '600 11px system-ui';
+  ctx.textAlign = 'center';
+  for(let t = 0; t <= current.T; t++){
+    const [x] = mapXY(k, t, 0, w, h);
+    ctx.strokeStyle = '#e2e8f0';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x, pad.t); ctx.lineTo(x, h - pad.b); ctx.stroke();
+
+    ctx.fillStyle = '#475569';
+    ctx.fillText(t + 's', x, h - 12);
+  }
+
+  // 2. 水平數值格線與 Y 軸精準數字刻度
+  ctx.textAlign = 'right';
+  for(let v = min; v <= max + 0.001; v += step){
+    const [, y] = mapXY(k, 0, v, w, h);
+    ctx.strokeStyle = (Math.abs(v) < 0.001) ? '#475569' : '#e2e8f0';
+    ctx.lineWidth = (Math.abs(v) < 0.001) ? 1.8 : 1;
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w - pad.r, y); ctx.stroke();
+
+    ctx.fillStyle = '#334e68';
+    ctx.fillText(Math.round(v), pad.l - 8, y + 4);
+  }
+
+  // Y 軸主線
+  ctx.strokeStyle = '#334e68';
+  ctx.lineWidth = 1.8;
+  ctx.beginPath(); ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, h - pad.b); ctx.stroke();
+}
+
+function drawValueTag(ctx, x, y, text, bgColor='#2563eb'){
+  ctx.save();
+  ctx.font = 'bold 11px system-ui';
+  const tw = ctx.measureText(text).width + 10;
+  const th = 20;
+  let bx = x - tw / 2;
+  let by = y - 26;
+  if(by < 4) by = y + 10;
+  if(bx < 46) bx = 46;
+  if(bx + tw > ctx.canvas.clientWidth - 4) bx = ctx.canvas.clientWidth - tw - 4;
+
+  ctx.fillStyle = bgColor;
+  ctx.beginPath();
+  ctx.roundRect(bx, by, tw, th, 5);
+  ctx.fill();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.fillText(text, bx + tw / 2, by + 14);
+  ctx.restore();
+}
+
+function drawGraph(k){
+  const c = canvases[k], rect = c.getBoundingClientRect();
+  const w = rect.width, h = rect.height, ctx = ctxs[k];
+  if(!ctx) return;
+
+  drawGridAndAxes(k, ctx, w, h);
+
+  // 如果顯示解答，先畫綠色標準答案底線
+  if(showSolution && k !== current.given){
+    ctx.save();
+    ctx.strokeStyle = '#059669';
+    ctx.lineWidth = 3.5;
+    ctx.setLineDash([6, 5]);
+    ctx.beginPath();
+    for(let i = 0; i <= 60; i++){
+      const t = current.T * i / 60;
+      const [x, y] = mapXY(k, t, targetVal(k, t), w, h);
+      if(i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // 畫主曲線（已知曲線 或 用戶作答曲線）
+  const isGiven = (k === current.given);
+  ctx.save();
+  ctx.strokeStyle = '#2563eb';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  for(let i = 0; i <= 60; i++){
+    const t = current.T * i / 60;
+    const val = isGiven ? targetVal(k, t) : userVal(k, t);
+    const [x, y] = mapXY(k, t, val, w, h);
+    if(i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  ctx.restore();
+
+  // 若為已知圖：標出起點、中點與終點的清晰座標點，方便學生讀數計算
+  if(isGiven){
+    const pts = k === 'a'
+      ? [[current.T / 2, targetVal(k, current.T / 2)]]
+      : [[0, targetVal(k, 0)], [current.T, targetVal(k, current.T)]];
+    pts.forEach(([ptT, ptV]) => {
+      const [px, py] = mapXY(k, ptT, ptV, w, h);
+      ctx.fillStyle = '#1e40af';
+      ctx.beginPath(); ctx.arc(px, py, 5, 0, Math.PI * 2); ctx.fill();
+      drawValueTag(ctx, px, py, `(${ptT}s, ${ptV})`, '#1e40af');
+    });
+    return;
+  }
+
+  // 若為作答圖：畫出可拖曳控制點 + 即時數值標籤
+  const handles = getHandles(k, w, h);
+  handles.forEach(hObj => {
+    ctx.fillStyle = '#2563eb';
+    ctx.beginPath(); ctx.arc(hObj.x, hObj.y, 8, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2.5; ctx.stroke();
+    drawValueTag(ctx, hObj.x, hObj.y, hObj.label, '#2563eb');
+  });
+}
+
+function getHandles(k, w, h){
+  if(k === 's'){
+    const [mx, my] = mapXY('s', current.T / 2, user.s.mid, w, h);
+    const [ex, ey] = mapXY('s', current.T, user.s.end, w, h);
+    return [
+      { id: 'mid', x: mx, y: my, label: `中點: ${user.s.mid} m` },
+      { id: 'end', x: ex, y: ey, label: `終點: ${user.s.end} m` }
+    ];
+  }
+  if(k === 'v'){
+    const [sx, sy] = mapXY('v', 0, user.v.start, w, h);
+    const [ex, ey] = mapXY('v', current.T, user.v.end, w, h);
+    return [
+      { id: 'start', x: sx, y: sy, label: `u = ${user.v.start}` },
+      { id: 'end', x: ex, y: ey, label: `v = ${user.v.end}` }
+    ];
+  }
+  const [ax, ay] = mapXY('a', current.T / 2, user.a.val, w, h);
+  return [{ id: 'val', x: ax, y: ay, label: `a = ${user.a.val} m s⁻²` }];
+}
+
+function drawAll(){
+  if(!current) return;
+  TYPES.forEach(drawGraph);
+}
+
+function resize(){
+  for(const k of TYPES){
+    const c = canvases[k], r = c.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+    c.width = Math.round(r.width * dpr);
+    c.height = Math.round(r.height * dpr);
+    ctxs[k] = c.getContext('2d');
+    ctxs[k].setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  drawAll();
+}
+window.addEventListener('resize', resize);
+
+// 拖曳互動（放寬點擊判定半徑至 42px，並支援整數磁吸）
+let dragInfo = null;
+for(const k of TYPES){
+  const c = canvases[k];
+  c.addEventListener('pointerdown', e => {
+    if(k === current.given) return;
+    const r = c.getBoundingClientRect();
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    const handles = getHandles(k, r.width, r.height);
+    let best = null, minDist = 999;
+    handles.forEach(h => {
+      const d = Math.hypot(x - h.x, y - h.y);
+      if(d < minDist){ minDist = d; best = h.id; }
+    });
+    if(minDist < 42){
+      dragInfo = { k, handle: best };
+      c.setPointerCapture(e.pointerId);
+    }
+  });
+
+  c.addEventListener('pointermove', e => {
+    if(!dragInfo || dragInfo.k !== k) return;
+    const r = c.getBoundingClientRect();
+    const snappedVal = invYWithSnap(k, e.clientY - r.top, r.width, r.height);
+
+    if(k === 's'){
+      if(dragInfo.handle === 'end'){
+        const oldEnd = user.s.end;
+        user.s.end = snappedVal;
+        // 若原本是直線，拉動終點時中點自動保持直線比例，方便學生先拉斜線再調曲率
+        if(Math.abs(user.s.mid - oldEnd / 2) < 0.1){
+          user.s.mid = Math.round((snappedVal / 2) / current.scaleConfig.s.snap) * current.scaleConfig.s.snap;
+        }
+      } else {
+        user.s.mid = snappedVal;
+      }
+    } else if(k === 'v'){
+      user.v[dragInfo.handle] = snappedVal;
+    } else if(k === 'a'){
+      user.a.val = snappedVal;
+    }
+    drawGraph(k);
+  });
+
+  c.addEventListener('pointerup', () => dragInfo = null);
+}
+
+// 寬鬆且符合邏輯的批改標準
+function evaluateGraph(k){
+  if(k === 'a'){
+    return Math.abs(user.a.val - current.a) < 0.1;
+  }
+  if(k === 'v'){
+    return Math.abs(user.v.start - current.v0) < 0.1 && Math.abs(user.v.end - current.vT) < 0.1;
+  }
+  if(k === 's'){
+    // 1. 檢查終點位移是否正確
+    const endCorrect = Math.abs(user.s.end - current.sT) < 0.1;
+    // 2. 檢查曲率方向是否正確（加速：中點低於直線中點；減速：中點高於直線中點；勻速：中點等於直線中點）
+    const linearMid = current.sT / 2;
+    let curveCorrect = false;
+    if(current.a > 0) curveCorrect = (user.s.mid < linearMid - 0.5);
+    else if(current.a < 0) curveCorrect = (user.s.mid > linearMid + 0.5);
+    else curveCorrect = (Math.abs(user.s.mid - linearMid) < 0.5);
+    return endCorrect && curveCorrect;
+  }
+}
+
+function checkGraphs(){
+  total++;
+  const toCheck = TYPES.filter(k => k !== current.given);
+  let allOk = true;
+  toCheck.forEach(k => {
+    const ok = evaluateGraph(k);
+    if(!ok) allOk = false;
+    const st = document.getElementById(k + 'Status');
+    st.textContent = ok ? '✅ 正確' : '❌ 需修正';
+    st.style.color = ok ? '#059669' : '#e11d48';
+  });
+
+  if(allOk) score++;
+  document.getElementById('score').textContent = score;
+  document.getElementById('total').textContent = total;
+  showSolution = true;
+  drawAll();
+
+  const fb = document.getElementById('feedback');
+  fb.className = 'feedback ' + (allOk ? 'ok' : 'bad');
+  if(allOk){
+    fb.innerHTML = `✅ <b>完全正確！</b> 總位移 s(${current.T}s) = ${current.sT} m，末速度 v(${current.T}s) = ${current.vT} m s⁻¹，加速度 a = ${current.a} m s⁻²。`;
+  } else {
+    let tip = '';
+    if(current.a > 0) tip = '勻加速時，s–t 圖斜率漸增（曲線向上彎，中點低於直線），v–t 圖斜率為正。';
+    else if(current.a < 0) tip = '勻減速時，s–t 圖斜率漸減（曲線趨向平坦，中點高於直線），v–t 圖斜率為負。';
+    else tip = '勻速或靜止時，加速度 a = 0，s–t 圖為直線。';
+    fb.innerHTML = `❌ <b>部分圖形未完全準確（請參考綠色虛線標準答案）：</b><br>${tip} 終點應為 s = ${current.sT} m, v = ${current.vT} m s⁻¹。`;
+  }
+}
+
+function buildNumericQuestion(){
+  const { T, v0, a, sT, vT } = current;
+  const avgSpeed = sT / T;
+  const qPool = [
+    { text: `求物體在 0 至 ${T} s 內的<b>總位移 (Total Displacement)</b>：`, ans: sT, unit: 'm' },
+    { text: `求物體在 0 至 ${T} s 內的<b>平均速率 (Average Speed)</b>：`, ans: avgSpeed, unit: 'm s⁻¹' },
+    { text: `求物體在 t = ${T} s 時的<b>瞬時速度 (Instantaneous Velocity)</b>：`, ans: vT, unit: 'm s⁻¹' },
+    { text: `求物體運動的<b>加速度 (Acceleration)</b>：`, ans: a, unit: 'm s⁻²' }
+  ];
+  current.num = pick(qPool);
+  document.getElementById('calcText').innerHTML = '🧮 <b>數據計算題：</b> ' + current.num.text;
+  document.getElementById('unitText').textContent = current.num.unit;
+}
+
+function checkNumber(){
+  const x = parseFloat(document.getElementById('numAnswer').value);
+  const fb = document.getElementById('feedback');
+  if(!Number.isFinite(x)){
+    fb.className = 'feedback bad';
+    fb.textContent = '請先在輸入框填寫計算數值。';
+    return;
+  }
+  const ok = Math.abs(x - current.num.ans) < 0.05;
+  fb.className = 'feedback ' + (ok ? 'ok' : 'bad');
+  fb.innerHTML = ok
+    ? `✅ <b>計算正確！</b> 答案正是 ${current.num.ans} ${current.num.unit}。`
+    : `❌ <b>計算有誤。</b> 正確答案應為 <b>${current.num.ans} ${current.num.unit}</b>（提示：可從已知圖的面積或斜率求得）。`;
+}
+
+document.getElementById('checkBtn').onclick = checkGraphs;
+document.getElementById('answerBtn').onclick = () => { showSolution = true; drawAll(); };
+document.getElementById('resetBtn').onclick = () => { setDefaultUser(); showSolution = false; drawAll(); };
+document.getElementById('nextBtn').onclick = makeQuestion;
+document.getElementById('checkNum').onclick = checkNumber;
+
+makeQuestion();
+setTimeout(resize, 50);
+</script>
+</body>
+</html>
